@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Reservas | RESERVAS UR_STEAM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Base Setup */
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        /* Sidebar Glass Effect */
+        .glass-sidebar {
+            background: #1e293b;
+            /* Slate 800 */
+            color: white;
+        }
+
+        /* Nav Buttons */
+        .sidebar-btn {
+            transition: all 0.2s;
+            border-right: 3px solid transparent;
+        }
+
+        .sidebar-btn.active {
+            background: rgba(59, 130, 246, 0.1);
+            color: #60a5fa;
+            /* Blue 400 */
+            border-right-color: #60a5fa;
+        }
+
+        .sidebar-btn:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.05);
+            color: #e2e8f0;
+        }
+
+        /* Card Styles for Light Mode */
+        .card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            border-radius: 0.75rem;
+        }
+
+        .card-header {
+            border-bottom: 1px solid #f1f5f9;
+            padding: 1.25rem;
+            background: #f8fafc;
+        }
+
+        /* Professional Charts */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 h-screen flex overflow-hidden text-slate-800">
+
+    <!-- Sidebar (Dark) -->
+    <aside class="w-64 glass-sidebar flex flex-col h-full shadow-xl z-20 flex-shrink-0">
+        <div class="p-6 border-b border-slate-700/50">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 p-2 rounded-lg text-white shadow-lg shadow-blue-900/50">
+                    <i class="fas fa-cube text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight text-white leading-tight">Reservas</h1>
+                    <p class="text-[10px] text-blue-400 font-bold tracking-widest uppercase">UR_STEAM</p>
+                </div>
+            </div>
+        </div>
+
+        <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 ml-3">Operaciones</p>
+
+            <button onclick="switchTab('dashboard')" id="btn-dash"
+                class="sidebar-btn active w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 text-slate-400 font-medium text-sm">
+                <i class="fas fa-columns w-5 text-center"></i> Dashboard
+            </button>
+            <button onclick="switchTab('graficos')" id="btn-graficos"
+                class="sidebar-btn w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 text-slate-400 font-medium text-sm">
+                <i class="fas fa-stream w-5 text-center"></i> Cronograma
+            </button>
+            <button onclick="switchTab('tabla')" id="btn-tabla"
+                class="sidebar-btn w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 text-slate-400 font-medium text-sm">
+                <i class="fas fa-table w-5 text-center"></i> Registros
+            </button>
+
+            <div class="my-4 border-t border-slate-700/50"></div>
+
+            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 ml-3">Gerencia</p>
+            <button onclick="switchTab('gerencia')" id="btn-gerencia"
+                class="sidebar-btn w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 text-slate-400 font-medium text-sm">
+                <i class="fas fa-chart-pie w-5 text-center"></i> Indicadores de Uso
+            </button>
+        </nav>
+
+        <div class="p-4 bg-slate-800/50 text-xs text-center text-slate-500 border-t border-slate-700">
+            &copy; 2026 GEMA
+        </div>
+    </aside>
+
+    <!-- Main Content (Light) -->
+    <main class="flex-1 overflow-y-auto bg-slate-50 relative">
+        <div class="p-8 max-w-[1600px] mx-auto space-y-8">
+
+            <!-- Header -->
+            <div class="flex justify-between items-end">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Panel de Control</h2>
+                    <p class="text-slate-500 text-sm">Gestión de espacios y reservas académicas</p>
+                </div>
+                <div id="dropzone"
+                    class="flex items-center gap-3 bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm cursor-pointer hover:border-blue-300 transition-colors">
+                    <input type="file" id="fileInput" class="hidden" accept=".csv">
+                    <div class="bg-blue-50 text-blue-600 p-2 rounded-md"><i class="fas fa-cloud-upload-alt"></i></div>
+                    <div class="text-left">
+                        <p class="text-xs font-bold text-slate-700">Importar CSV</p>
+                        <p class="text-[10px] text-slate-400">Clic para actualizar datos</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Overview -->
+            <div id="stats" class="grid grid-cols-1 md:grid-cols-4 gap-6 hidden">
+                <div class="card p-5 border-l-4 border-l-blue-500">
+                    <p class="text-xs text-slate-500 font-bold uppercase mb-1">Total Reservas</p>
+                    <h3 id="total-reservas" class="text-2xl font-bold text-slate-800">0</h3>
+                </div>
+                <div class="card p-5 border-l-4 border-l-emerald-500">
+                    <p class="text-xs text-slate-500 font-bold uppercase mb-1">Salas Activas</p>
+                    <h3 id="total-salas" class="text-2xl font-bold text-slate-800">0</h3>
+                </div>
+                <div class="card p-5 border-l-4 border-l-violet-500">
+                    <p class="text-xs text-slate-500 font-bold uppercase mb-1">Horas Totales</p>
+                    <h3 id="total-horas" class="text-2xl font-bold text-slate-800">0</h3>
+                </div>
+                <div class="card p-5 border-l-4 border-l-slate-500">
+                    <p class="text-xs text-slate-500 font-bold uppercase mb-1">Última Carga</p>
+                    <h3 id="update-date" class="text-sm font-bold text-slate-800 mt-1.5 truncate">-</h3>
+                </div>
+            </div>
+
+            <!-- VIEWS -->
+
+            <!-- 1. DASHBOARD VIEW -->
+            <div id="view-dashboard" class="grid grid-cols-1 xl:grid-cols-2 gap-6"></div>
+
+            <!-- 2. CRONOGRAMA / GRAFICOS VIEW -->
+            <div id="view-graficos" class="hidden space-y-6">
+                <div class="card p-4 flex justify-between items-center sticky top-0 z-10 shadow-md">
+                    <h3 class="font-bold text-slate-700 flex items-center gap-2">
+                        <i class="far fa-calendar-alt text-blue-500"></i> Cronograma Diario
+                    </h3>
+                    <select id="chart-date-selector"
+                        class="bg-slate-50 border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none">
+                        <option value="">Seleccione día...</option>
+                    </select>
+                </div>
+                <div id="charts-main-container"></div>
+            </div>
+
+            <!-- 3. TABLA VIEW -->
+            <div id="view-tabla" class="hidden card overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-50 text-slate-600 text-xs uppercase font-bold tracking-wider">
+                            <tr>
+                                <th class="p-4 border-b">Nombre</th>
+                                <th class="p-4 border-b">Sala</th>
+                                <th class="p-4 border-b">Inicio</th>
+                                <th class="p-4 border-b">Fin</th>
+                                <th class="p-4 border-b">Creado por</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body" class="text-sm text-slate-600 divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 4. GERENCIA VIEW (NEW) -->
+            <div id="view-gerencia" class="hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Chart: Top Salas -->
+                    <div class="card p-6">
+                        <h3 class="text-lg font-bold text-slate-800 mb-2">Utilización por Sala (Horas)</h3>
+                        <p class="text-sm text-slate-500 mb-6">Total de horas reservadas acumuladas por espacio.</p>
+                        <div class="chart-container">
+                            <canvas id="chart-salas-uso"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Chart: Reservas por Dia Semana -->
+                    <div class="card p-6">
+                        <h3 class="text-lg font-bold text-slate-800 mb-2">Distribución Semanal</h3>
+                        <p class="text-sm text-slate-500 mb-6">Frecuencia de reservas agrupadas por día de la semana.
+                        </p>
+                        <div class="chart-container">
+                            <canvas id="chart-dias-semana"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Chart: Top Usuarios -->
+                    <div class="card p-6 lg:col-span-2">
+                        <h3 class="text-lg font-bold text-slate-800 mb-2">Top Usuarios / Departamentos</h3>
+                        <p class="text-sm text-slate-500 mb-6">Usuarios con mayor número de reservas generadas.</p>
+                        <div class="h-64">
+                            <canvas id="chart-usuarios"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Chart: Evolucion Mensual (New) -->
+                    <div class="card p-6 lg:col-span-2">
+                        <h3 class="text-lg font-bold text-slate-800 mb-2">Evolución Mensual</h3>
+                        <p class="text-sm text-slate-500 mb-6">Tendencia de reservas agrupadas por mes.</p>
+                        <div class="chart-container">
+                            <canvas id="chart-mensual"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // --- CONFIG ---
+        const fileInput = document.getElementById('fileInput');
+        const dropzone = document.getElementById('dropzone');
+        let rawData = [];
+        let globalChart = null;
+
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.color = '#64748b';
+
+        // --- HELPER: FUZZY KEY FINDER ---
+        // To handle encoding issues like "Duracin" vs "Duración"
+        function findKey(obj, partial) {
+            if (!obj) return null;
+            const keys = Object.keys(obj);
+            // 1. Exact match
+            if (keys.includes(partial)) return partial;
+            // 2. Includes match
+            const found = keys.find(k => k.toLowerCase().includes(partial.toLowerCase()));
+            return found || null;
+        }
+
+        // --- TABS ---
+        function switchTab(tab) {
+            const views = ['dashboard', 'graficos', 'tabla', 'gerencia'];
+            views.forEach(v => {
+                const el = document.getElementById('view-' + v);
+                const btn = document.getElementById('btn-' + v);
+                if (v === tab) {
+                    el.classList.remove('hidden');
+                    if (btn) btn.classList.add('active');
+                } else {
+                    el.classList.add('hidden');
+                    if (btn) btn.classList.remove('active');
+                }
+            });
+            // Trigger resize for charts when tab becomes visible
+            if (tab === 'gerencia' || tab === 'graficos') {
+                window.dispatchEvent(new Event('resize'));
+            }
+        }
+
+        // --- FILE HANDLING ---
+        dropzone.onclick = () => fileInput.click();
+        fileInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) procesarArchivo(file);
+        };
+
+        function procesarArchivo(file) {
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                encoding: "ISO-8859-1", // Specifying encoding usually helps with Excel CSVs on Windows
+                complete: function (results) {
+                    rawData = results.data;
+                    document.getElementById('stats').classList.remove('hidden');
+                    document.getElementById('stats').classList.add('grid');
+                    renderStats();
+                    renderDashboard();
+                    initTimelineCharts();
+                    renderGerenciaCharts();
+                }
+            });
+        }
+
+        // --- UTILS ---
+        function parseCustomDate(dateStr) {
+            // "07:00 - Monday 26 January 2026"
+            try {
+                if (!dateStr) return null;
+                const parts = dateStr.split(' - ');
+                // Sometimes might be just "Monday..." if time is missing, check parts
+                let time = "00:00";
+                let dateRaw = dateStr;
+
+                if (parts.length >= 2) {
+                    time = parts[0];
+                    dateRaw = parts[1];
+                }
+
+                // Handle "Monday 26 January 2026"
+                // Remove Day Name if it exists
+                const dateParts = dateRaw.trim().split(' ');
+                // Expect: [DayName, Day, Month, Year] or [Day, Month, Year]
+                // If starts with alpha, remove first
+                let cleanDate = dateRaw;
+                if (isNaN(parseInt(dateParts[0]))) {
+                    cleanDate = dateParts.slice(1).join(' ');
+                }
+
+                const dateObj = new Date(cleanDate);
+                if (isNaN(dateObj.getTime())) return null;
+
+                const [hh, mm] = time.split(':').map(Number);
+                const decimalTime = (isNaN(hh) ? 0 : hh) + ((isNaN(mm) ? 0 : mm) / 60);
+
+                return {
+                    dateObj,
+                    isoDate: dateObj.toISOString().split('T')[0], // 2026-01-26
+                    monthKey: dateObj.toISOString().slice(0, 7), // 2026-01
+                    decimalTime,
+                    dayName: dateParts[0],
+                    fullDate: dateRaw
+                };
+            } catch (e) { return null; }
+        }
+
+        // --- RENDERERS ---
+
+        function renderStats() {
+            if (!rawData.length) return;
+            const sample = rawData[0];
+            const kSala = findKey(sample, 'Sala');
+            const kDuracion = findKey(sample, 'Duraci'); // Matches Duración or Duracin
+            const kUpdate = findKey(sample, 'ctualizaci'); // Matches Actualización
+
+            const salas = new Set(rawData.map(r => r[kSala]).filter(Boolean));
+            document.getElementById('total-reservas').innerText = rawData.length;
+            document.getElementById('total-salas').innerText = salas.size;
+            document.getElementById('update-date').innerText = rawData[0]?.[kUpdate] || 'N/A';
+
+            // Calculate total hours
+            let totalHours = 0;
+            rawData.forEach(r => {
+                const durVal = r[kDuracion]; // "12 Horas"
+                if (durVal) {
+                    const h = parseInt(durVal);
+                    if (!isNaN(h)) totalHours += h;
+                }
+            });
+            document.getElementById('total-horas').innerText = totalHours;
+        }
+
+        function renderDashboard() {
+            const container = document.getElementById('view-dashboard');
+            const tableBody = document.getElementById('table-body');
+            container.innerHTML = '';
+            tableBody.innerHTML = '';
+
+            if (!rawData.length) return;
+            const sample = rawData[0];
+
+            // Dynamic Keys
+            const kSala = findKey(sample, 'Sala');
+            const kNombre = findKey(sample, 'Nombre');
+            const kInicio = findKey(sample, 'Inicio');
+            const kFin = findKey(sample, 'Fin');
+            const kCreado = findKey(sample, 'Creada');
+            const kEstado = findKey(sample, 'confirmaci');
+            const kDuracion = findKey(sample, 'Duraci');
+
+            const salas = [...new Set(rawData.map(r => r[kSala]))].filter(Boolean).sort();
+
+            salas.forEach(sala => {
+                const reservas = rawData.filter(r => r[kSala] === sala);
+
+                // Card HTML
+                let html = `
+                    <div class="card overflow-hidden">
+                        <div class="card-header flex justify-between items-center bg-slate-50/50">
+                            <h3 class="font-bold text-slate-700 flex items-center gap-2">
+                                <span class="w-8 h-8 rounded bg-white border border-slate-200 text-blue-600 flex items-center justify-center text-sm shadow-sm"><i class="fas fa-cube"></i></span>
+                                ${sala}
+                            </h3>
+                            <span class="text-[10px] font-bold bg-blue-50 text-blue-600 px-2 py-1 rounded-full border border-blue-100">${reservas.length} RESERVAS</span>
+                        </div>
+                        <div class="p-4 space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar">
+                `;
+
+                reservas.forEach(r => {
+                    html += `
+                        <div class="p-3 bg-white rounded border border-slate-100 text-sm hover:border-blue-300 transition-colors shadow-sm group">
+                            <div class="flex justify-between mb-1">
+                                <span class="font-bold text-slate-800 truncate pr-2 group-hover:text-blue-600 transition-colors">${r[kNombre]}</span>
+                                <span class="text-[10px] font-bold uppercase text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">${r[kEstado] || 'OK'}</span>
+                            </div>
+                            <div class="text-xs text-slate-400 flex flex-wrap gap-3">
+                                <span><i class="far fa-clock text-slate-300 mr-1"></i>${(r[kInicio] || '').split(' - ')[0]}</span>
+                                <span><i class="fas fa-hourglass-half text-slate-300 mr-1"></i>${r[kDuracion]}</span>
+                                <span class="w-full sm:w-auto"><i class="far fa-user text-slate-300 mr-1"></i>${r[kCreado]}</span>
+                            </div>
+                        </div>
+                     `;
+
+                    // Table Row
+                    tableBody.innerHTML += `
+                        <tr class="hover:bg-slate-50 transition-colors border-b border-slate-100">
+                            <td class="p-4 font-medium text-slate-700">${r[kNombre]}</td>
+                            <td class="p-4 text-slate-500 text-xs">${r[kSala]}</td>
+                            <td class="p-4 text-xs font-mono text-blue-600">${(r[kInicio] || '')}</td>
+                            <td class="p-4 text-xs font-mono text-blue-600">${(r[kFin] || '')}</td>
+                            <td class="p-4 text-xs text-slate-500">${r[kCreado]}</td>
+                        </tr>
+                     `;
+                });
+
+                html += `</div></div>`;
+                container.innerHTML += html;
+            });
+        }
+
+        // --- CHART: TIMELINE (CRONOGRAMA) ---
+        let timelineData = {};
+
+        function initTimelineCharts() {
+            timelineData = {};
+            const selector = document.getElementById('chart-date-selector');
+            selector.innerHTML = '<option value="">Seleccione día...</option>';
+            const container = document.getElementById('charts-main-container');
+            container.innerHTML = '';
+
+            if (!rawData.length) return;
+            const sample = rawData[0];
+            const kInicio = findKey(sample, 'Inicio');
+            const kFin = findKey(sample, 'Fin');
+            const kSala = findKey(sample, 'Sala');
+
+            // Group by Date
+            rawData.forEach(r => {
+                if (!r[kInicio] || !r[kFin]) return;
+                const start = parseCustomDate(r[kInicio]);
+                const end = parseCustomDate(r[kFin]);
+
+                if (start && end) {
+                    const key = start.isoDate; // YYYY-MM-DD
+                    if (!timelineData[key]) {
+                        timelineData[key] = {
+                            label: start.fullDate, // "Monday 26 January..."
+                            items: []
+                        };
+                    }
+                    timelineData[key].items.push({
+                        room: r[kSala],
+                        start: start.decimalTime,
+                        end: end.decimalTime,
+                        full: r
+                    });
+                }
+            });
+
+            // Populate Selector
+            const dates = Object.keys(timelineData).sort();
+            dates.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d;
+                opt.innerText = timelineData[d].label;
+                selector.appendChild(opt);
+            });
+
+            // Listen
+            selector.onchange = (e) => {
+                if (e.target.value) renderTimeline(e.target.value);
+                else container.innerHTML = '';
+            };
+
+            // Select First Default
+            if (dates.length) {
+                selector.value = dates[0];
+                renderTimeline(dates[0]);
+            }
+        }
+
+        function renderTimeline(dateKey) {
+            const container = document.getElementById('charts-main-container');
+            container.innerHTML = '';
+
+            const data = timelineData[dateKey];
+            if (!data) return;
+
+            // Container for Canvas
+            const wrapper = document.createElement('div');
+            wrapper.className = 'card p-4 h-[500px] relative';
+            const canvas = document.createElement('canvas');
+            wrapper.appendChild(canvas);
+            container.appendChild(wrapper);
+
+            const rooms = [...new Set(data.items.map(i => i.room))].sort();
+
+            // Prepare Data for Chart.js Floating Bars
+            const dataset = data.items.map(i => ({
+                x: [i.start, i.end],
+                y: i.room,
+                details: i.full
+            }));
+
+            new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels: rooms,
+                    datasets: [{
+                        label: 'Ocupación',
+                        data: dataset,
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderColor: '#2563eb',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                        barPercentage: 0.6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            min: 6,
+                            max: 22,
+                            ticks: { stepSize: 1 },
+                            title: { display: true, text: 'Hora (06:00 - 22:00)' }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => {
+                                    const d = ctx.raw.details;
+                                    const kNombre = findKey(d, 'Nombre');
+                                    const kInicio = findKey(d, 'Inicio');
+                                    const kFin = findKey(d, 'Fin');
+                                    return `${d[kNombre]} (${d[kInicio].split(' - ')[0]} - ${d[kFin].split(' - ')[0]})`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- CHART: GERENCIA (ANALYTICS) ---
+        let chartsInstances = {};
+
+        function renderGerenciaCharts() {
+            // Destroy old if exists
+            ['chart-salas-uso', 'chart-dias-semana', 'chart-usuarios', 'chart-mensual'].forEach(id => {
+                if (chartsInstances[id]) chartsInstances[id].destroy();
+            });
+
+            if (!rawData.length) return;
+            const sample = rawData[0];
+            const kSala = findKey(sample, 'Sala');
+            const kDuracion = findKey(sample, 'Duraci');
+            const kInicio = findKey(sample, 'Inicio');
+            const kCreado = findKey(sample, 'Creada');
+
+            // 1. Salas Usage (Total Hours)
+            const horasPorSala = {};
+            rawData.forEach(r => {
+                if (r[kSala] && r[kDuracion]) {
+                    const h = parseInt(r[kDuracion]) || 0;
+                    horasPorSala[r[kSala]] = (horasPorSala[r[kSala]] || 0) + h;
+                }
+            });
+            const topSalas = Object.entries(horasPorSala).sort((a, b) => b[1] - a[1]);
+
+            chartsInstances['chart-salas-uso'] = new Chart(document.getElementById('chart-salas-uso'), {
+                type: 'bar',
+                data: {
+                    labels: topSalas.map(k => k[0]),
+                    datasets: [{
+                        label: 'Horas Totales',
+                        data: topSalas.map(k => k[1]),
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            // 2. Days of Week
+            const diasOrden = { "Monday": 1, "Tuesday": 2, "Wednesday": 3, "Thursday": 4, "Friday": 5, "Saturday": 6, "Sunday": 7 };
+            const diasCount = {};
+            const mesCount = {};
+
+            rawData.forEach(r => {
+                const info = parseCustomDate(r[kInicio] || '');
+                if (info) {
+                    const dia = info.dayName;
+                    diasCount[dia] = (diasCount[dia] || 0) + 1;
+
+                    // Month Aggregation
+                    const mes = info.monthKey; // 2026-01
+                    mesCount[mes] = (mesCount[mes] || 0) + 1;
+                }
+            });
+            const sortedDays = Object.keys(diasCount).sort((a, b) => diasOrden[a] - diasOrden[b]);
+
+            chartsInstances['chart-dias-semana'] = new Chart(document.getElementById('chart-dias-semana'), {
+                type: 'bar',
+                data: {
+                    labels: sortedDays,
+                    datasets: [{
+                        label: 'Número de Reservas',
+                        data: sortedDays.map(d => diasCount[d]),
+                        backgroundColor: '#8b5cf6',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            // 3. User Stats
+            const userCount = {};
+            rawData.forEach(r => {
+                const u = r[kCreado] || 'Desconocido';
+                userCount[u] = (userCount[u] || 0) + 1;
+            });
+            const topUsers = Object.entries(userCount).sort((a, b) => b[1] - a[1]).slice(0, 10);
+
+            chartsInstances['chart-usuarios'] = new Chart(document.getElementById('chart-usuarios'), {
+                type: 'bar',
+                data: {
+                    labels: topUsers.map(u => u[0]),
+                    datasets: [{
+                        label: 'Reservas Generadas',
+                        data: topUsers.map(u => u[1]),
+                        backgroundColor: '#10b981',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            // 4. Monthly Stats (New)
+            const sortedMonths = Object.keys(mesCount).sort();
+            chartsInstances['chart-mensual'] = new Chart(document.getElementById('chart-mensual'), {
+                type: 'line',
+                data: {
+                    labels: sortedMonths,
+                    datasets: [{
+                        label: 'Reservas por Mes (Total)',
+                        data: sortedMonths.map(m => mesCount[m]),
+                        borderColor: '#f43f5e',
+                        backgroundColor: 'rgba(244, 63, 94, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true } },
+                    plugins: { legend: { display: true } }
+                }
+            });
+        }
+
+    </script>
+</body>
+
+</html>
